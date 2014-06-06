@@ -52,6 +52,10 @@ func timeoutCounter(d time.Duration, done chan bool) {
 //
 // it returns the ZeroRPC response event on success
 //
+// if the ZeroRPC server raised an exception,
+// it's name is returned as the err string along with the response event,
+// the additional exception text and traceback can be found in the response event args
+//
 // it returns ErrZeroRPCTimeout if the ZeroRPC response timeouts,
 // the timeout duration is defined in ZeroRPCTimeout, default is 30 seconds
 func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
@@ -76,7 +80,13 @@ func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
 	for {
 		select {
 		case response := <-ch.ch:
-			return response, nil
+			if response.Name == "OK" {
+				return response, nil
+			} else if response.Name == "ERR" {
+				return response, errors.New(response.Args[0].(string))
+			} else {
+				return nil, errors.New("zerorpc/client invalid response event name")
+			}
 
 		case <-timeout:
 			return nil, ErrZeroRPCTimeout

@@ -114,13 +114,15 @@ func UnPackBytes(b []byte) (*Event, error) {
 	args := make([]interface{}, 0)
 
 	// handle both array of results and a single result
-	x, ok := a[0].([]interface{})
-	if ok {
-		for _, v := range x {
-			args = append(args, convertValue(v))
+	for _, b := range a {
+		x, ok := b.([]interface{})
+		if ok {
+			for _, v := range x {
+				args = append(args, convertValue(v))
+			}
+		} else {
+			args = append(args, convertValue(b))
 		}
-	} else {
-		args = append(args, convertValue(a[0]))
 	}
 
 	e := Event{
