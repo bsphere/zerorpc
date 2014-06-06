@@ -7,7 +7,7 @@ import (
 )
 
 // ZeroMQ protocol version
-const ProtocolVersion = 4
+const ProtocolVersion = 3
 
 // Event representation
 type Event struct {
