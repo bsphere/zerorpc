@@ -47,28 +47,6 @@ func (s *Socket) Close() error {
 	return s.zmqSocket.Close()
 }
 
-// Returns a pointer to a new channel,
-// it adds the channel to the socket's array of channels
-//
-// it initiates sending of heartbeats event on the channel as long as
-// the channel is open
-func (s *Socket) NewChannel() *Channel {
-	c := Channel{
-		Id:     "",
-		state:  Open,
-		socket: s,
-		ch:     make(chan *Event),
-	}
-
-	s.Channels = append(s.Channels, &c)
-
-	log.Printf("ZeroRPC socket created new channel %s", c.Id)
-
-	//go c.sendHeartbeats()
-
-	return &c
-}
-
 // Removes a channel from the socket's array of channels
 func (s *Socket) RemoveChannel(c *Channel) {
 	channels := make([]*Channel, 0)

@@ -31,6 +31,28 @@ type Channel struct {
 	ch     chan *Event
 }
 
+// Returns a pointer to a new channel,
+// it adds the channel to the socket's array of channels
+//
+// it initiates sending of heartbeats event on the channel as long as
+// the channel is open
+func (s *Socket) NewChannel() *Channel {
+	c := Channel{
+		Id:     "",
+		state:  Open,
+		socket: s,
+		ch:     make(chan *Event),
+	}
+
+	s.Channels = append(s.Channels, &c)
+
+	log.Printf("ZeroRPC socket created new channel %s", c.Id)
+
+	//go c.sendHeartbeats()
+
+	return &c
+}
+
 // Close the channel,
 // set it's state to closed and removes it from the socket's array of channels
 func (ch *Channel) Close() {
@@ -71,7 +93,7 @@ func (ch *Channel) sendHeartbeats() {
 			return
 		}
 
-		ev, err := ch.NewHeartbeat()
+		ev, err := NewHeartbeat()
 		if err != nil {
 			return
 		}
