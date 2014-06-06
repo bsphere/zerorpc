@@ -144,8 +144,14 @@ func (ch *Channel) listen() {
 
 func (ch *Channel) handleHeartbeats() {
 	for {
+		if ch.state == Closed {
+			return
+		}
+
 		if time.Since(ch.lastHeartbeat) > 2*HeartbeatFrequency {
 			ch.channelErrors <- ErrLostRemote
 		}
+
+		time.Sleep(time.Second)
 	}
 }
