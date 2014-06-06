@@ -9,11 +9,7 @@ import (
 const (
 	// ZeroRPC timeout,
 	// default is 30 seconds
-	ZeroRPCTimeout = 30 * time.Second
-)
-
-var (
-	ErrZeroRPCTimeout = errors.New("zerorpc/client timeout")
+	ZeroRPCTimeout = 1 * time.Minute
 )
 
 // ZeroRPC client representation,
@@ -41,11 +37,6 @@ func (c *Client) Close() error {
 	return c.socket.Close()
 }
 
-func timeoutCounter(d time.Duration, done chan bool) {
-	time.Sleep(d)
-	done <- true
-}
-
 // Invokes a ZeroRPC method,
 // name is the method name,
 // args are the method arguments
@@ -56,8 +47,8 @@ func timeoutCounter(d time.Duration, done chan bool) {
 // it's name is returned as the err string along with the response event,
 // the additional exception text and traceback can be found in the response event args
 //
-// it returns ErrZeroRPCTimeout if the ZeroRPC response timeouts,
-// the timeout duration is defined in ZeroRPCTimeout, default is 30 seconds
+// it returns ErrLostRemote if the channel misses 2 heartbeat events,
+// default is 10 seconds
 func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
 	log.Printf("ZeroRPC client invoked %s with args %s", name, args)
 
@@ -74,22 +65,17 @@ func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
 		return nil, err
 	}
 
-	timeout := make(chan bool)
-	go timeoutCounter(ZeroRPCTimeout, timeout)
-
 	for {
 		select {
-		case response := <-ch.ch:
-			if response.Name == "OK" {
-				return response, nil
-			} else if response.Name == "ERR" {
+		case response := <-ch.channelOutput:
+			if response.Name == "ERR" {
 				return response, errors.New(response.Args[0].(string))
 			} else {
-				return nil, errors.New("zerorpc/client invalid response event name")
+				return response, nil
 			}
 
-		case <-timeout:
-			return nil, ErrZeroRPCTimeout
+		case err := <-ch.channelErrors:
+			return nil, err
 		}
 	}
 }

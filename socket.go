@@ -112,7 +112,7 @@ func (s *Socket) listen() {
 				log.Printf("ZeroRPC socket routing event %s to channel %s", ev.Header["message_id"].(string),
 					ev.Header["response_to"].(string))
 
-				c.ch <- ev
+				c.socketInput <- ev
 			}
 		}
 

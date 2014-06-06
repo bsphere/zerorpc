@@ -21,14 +21,18 @@ const (
 
 var (
 	ErrClosedChannel = errors.New("zerorpc/channel closed channel")
+	ErrLostRemote    = errors.New("zerorpc/channel lost remote")
 )
 
 // Channel representation
 type Channel struct {
-	Id     string
-	state  State
-	socket *Socket
-	ch     chan *Event
+	Id            string
+	state         State
+	socket        *Socket
+	socketInput   chan *Event
+	channelOutput chan *Event
+	channelErrors chan error
+	lastHeartbeat time.Time
 }
 
 // Returns a pointer to a new channel,
@@ -38,17 +42,21 @@ type Channel struct {
 // the channel is open
 func (s *Socket) NewChannel() *Channel {
 	c := Channel{
-		Id:     "",
-		state:  Open,
-		socket: s,
-		ch:     make(chan *Event),
+		Id:            "",
+		state:         Open,
+		socket:        s,
+		socketInput:   make(chan *Event),
+		channelOutput: make(chan *Event),
+		channelErrors: make(chan error),
+		lastHeartbeat: time.Now(),
 	}
+
+	go c.listen()
+	go c.handleHeartbeats()
 
 	s.Channels = append(s.Channels, &c)
 
 	log.Printf("ZeroRPC socket created new channel %s", c.Id)
-
-	//go c.sendHeartbeats()
 
 	return &c
 }
@@ -60,11 +68,15 @@ func (ch *Channel) Close() {
 
 	ch.socket.RemoveChannel(ch)
 
+	close(ch.socketInput)
+	close(ch.channelOutput)
+	close(ch.channelErrors)
+
 	log.Printf("Channel %s closed", ch.Id)
 }
 
 // Sends an event on the channel,
-// it sets the event response_tp header to the channel's id
+// it sets the event response_to header to the channel's id
 // and sends the event on the socket the channel belongs to
 func (ch *Channel) SendEvent(e *Event) error {
 	if ch.state == Closed {
@@ -75,6 +87,8 @@ func (ch *Channel) SendEvent(e *Event) error {
 		e.Header["response_to"] = ch.Id
 	} else {
 		ch.Id = e.Header["message_id"].(string)
+
+		go ch.sendHeartbeats()
 	}
 
 	log.Printf("Channel %s sending event %s", ch.Id, e.Header["message_id"].(string))
@@ -95,15 +109,43 @@ func (ch *Channel) sendHeartbeats() {
 
 		ev, err := NewHeartbeat()
 		if err != nil {
+			log.Printf(err.Error())
+
 			return
 		}
 
-		log.Printf("Channel %s prepared heartbeat event %s", ch.Id, ev.Header["message_id"].(string))
+		//log.Printf("Channel %s prepared heartbeat event %s", ch.Id, ev.Header["message_id"].(string))
 
 		if err := ch.SendEvent(ev); err != nil {
-			panic(err)
+			log.Printf(err.Error())
+
+			return
 		}
 
 		log.Printf("Channel %s sent heartbeat", ch.Id)
+	}
+}
+
+func (ch *Channel) listen() {
+	for {
+		ev := <-ch.socketInput
+
+		switch ev.Name {
+		case "OK":
+			ch.channelOutput <- ev
+		case "ERR":
+			ch.channelOutput <- ev
+		case "_zpc_hb":
+			log.Printf("Channel %s received heartbeat", ch.Id)
+			ch.lastHeartbeat = time.Now()
+		}
+	}
+}
+
+func (ch *Channel) handleHeartbeats() {
+	for {
+		if time.Since(ch.lastHeartbeat) > 2*HeartbeatFrequency {
+			ch.channelErrors <- ErrLostRemote
+		}
 	}
 }

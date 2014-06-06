@@ -90,7 +90,7 @@ func UnPackBytes(b []byte) (*Event, error) {
 		return nil, errors.New("zerorpc/event interface conversion error")
 	}
 
-	// get the event headers
+	// get the event args
 	a, ok := v.([]interface{})[2].([]interface{})
 	if !ok {
 		return nil, errors.New("zerorpc/event interface conversion error")
