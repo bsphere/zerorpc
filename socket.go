@@ -6,11 +6,14 @@ import (
 	"log"
 )
 
+// ZeroRPC socket representation
 type Socket struct {
 	zmqSocket *zmq.Socket
 	Channels  []*Channel
 }
 
+// Connects to a ZeroMQ endpoint and returns a pointer to a new znq.DEALER socket,
+// a listener for incoming messages is invoked on the new socket
 func Connect(endpoint string) (*Socket, error) {
 	zmqSocket, err := zmq.NewSocket(zmq.DEALER)
 	if err != nil {
@@ -33,6 +36,8 @@ func Connect(endpoint string) (*Socket, error) {
 	return &s, nil
 }
 
+// Close the socket,
+// it closes all the channels first
 func (s *Socket) Close() error {
 	for _, c := range s.Channels {
 		c.Close()
@@ -42,8 +47,12 @@ func (s *Socket) Close() error {
 	return s.zmqSocket.Close()
 }
 
-// Returns a pointer to a new channel
-func (s *Socket) newChannel() *Channel {
+// Returns a pointer to a new channel,
+// it adds the channel to the socket's array of channels
+//
+// it initiates sending of heartbeats event on the channel as long as
+// the channel is open
+func (s *Socket) NewChannel() *Channel {
 	c := Channel{
 		Id:     "",
 		state:  Open,
@@ -60,7 +69,8 @@ func (s *Socket) newChannel() *Channel {
 	return &c
 }
 
-func (s *Socket) removeChannel(c *Channel) {
+// Removes a channel from the socket's array of channels
+func (s *Socket) RemoveChannel(c *Channel) {
 	channels := make([]*Channel, 0)
 
 	for _, t := range s.Channels {
@@ -72,6 +82,7 @@ func (s *Socket) removeChannel(c *Channel) {
 	s.Channels = channels
 }
 
+// Sends an event on the ZeroMQ socket
 func (s *Socket) SendEvent(e *Event) error {
 	b, err := e.PackBytes()
 	if err != nil {

@@ -31,14 +31,19 @@ type Channel struct {
 	ch     chan *Event
 }
 
+// Close the channel,
+// set it's state to closed and removes it from the socket's array of channels
 func (ch *Channel) Close() {
 	ch.state = Closed
 
-	ch.socket.removeChannel(ch)
+	ch.socket.RemoveChannel(ch)
 
 	log.Printf("Channel %s closed", ch.Id)
 }
 
+// Sends an event on the channel,
+// it sets the event response_tp header to the channel's id
+// and sends the event on the socket the channel belongs to
 func (ch *Channel) SendEvent(e *Event) error {
 	if ch.state == Closed {
 		return ErrClosedChannel
@@ -55,6 +60,9 @@ func (ch *Channel) SendEvent(e *Event) error {
 	return ch.socket.SendEvent(e)
 }
 
+// Sends heartbeat events on the channel as long as the channel is open,
+// the heartbeats interval is defined in HeartbeatFrequency,
+// default is 5 seconds
 func (ch *Channel) sendHeartbeats() {
 	for {
 		time.Sleep(HeartbeatFrequency)
