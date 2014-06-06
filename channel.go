@@ -2,17 +2,18 @@ package zerorpc
 
 import (
 	"errors"
-	"time"
 	"log"
+	"time"
 )
 
 const (
-	// Heartbeat frequenct,
+	// Heartbeat frequency,
 	// default is 5 seconds
 	HeartbeatFrequency = 5 * time.Second
 )
 
 type State int
+
 const (
 	Open = iota
 	Closed
@@ -24,10 +25,10 @@ var (
 
 // Channel representation
 type Channel struct {
-	Id string
-	state State
+	Id     string
+	state  State
 	socket *Socket
-	ch chan *Event
+	ch     chan *Event
 }
 
 func (ch *Channel) Close() {
@@ -76,4 +77,3 @@ func (ch *Channel) sendHeartbeats() {
 		log.Printf("Channel %s sent heartbeat", ch.Id)
 	}
 }
-

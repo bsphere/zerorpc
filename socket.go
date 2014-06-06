@@ -1,14 +1,14 @@
 package zerorpc
 
 import (
+	"bytes"
 	zmq "github.com/pebbe/zmq4"
 	"log"
-	"bytes"
 )
 
 type Socket struct {
 	zmqSocket *zmq.Socket
-	Channels []*Channel
+	Channels  []*Channel
 }
 
 func Connect(endpoint string) (*Socket, error) {
@@ -19,7 +19,7 @@ func Connect(endpoint string) (*Socket, error) {
 
 	s := Socket{
 		zmqSocket: zmqSocket,
-		Channels: make([]*Channel, 0),
+		Channels:  make([]*Channel, 0),
 	}
 
 	if err := s.zmqSocket.Connect(endpoint); err != nil {
@@ -45,10 +45,10 @@ func (s *Socket) Close() error {
 // Returns a pointer to a new channel
 func (s *Socket) newChannel() *Channel {
 	c := Channel{
-		Id: "",
-		state: Open,
+		Id:     "",
+		state:  Open,
 		socket: s,
-		ch: make(chan *Event),
+		ch:     make(chan *Event),
 	}
 
 	s.Channels = append(s.Channels, &c)
@@ -72,7 +72,7 @@ func (s *Socket) removeChannel(c *Channel) {
 	s.Channels = channels
 }
 
-func (s *Socket ) SendEvent(e *Event) error {
+func (s *Socket) SendEvent(e *Event) error {
 	b, err := e.PackBytes()
 	if err != nil {
 		return err
