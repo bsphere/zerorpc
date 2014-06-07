@@ -130,10 +130,18 @@ func (ch *Channel) listen() {
 	for {
 		ev := <-ch.socketInput
 
+		if ev == nil {
+			continue
+		}
+
 		switch ev.Name {
 		case "OK":
 			ch.channelOutput <- ev
 		case "ERR":
+			ch.channelOutput <- ev
+		case "STREAM":
+			ch.channelOutput <- ev
+		case "STREAM_DONE":
 			ch.channelOutput <- ev
 		case "_zpc_hb":
 			log.Printf("Channel %s received heartbeat", ch.Id)

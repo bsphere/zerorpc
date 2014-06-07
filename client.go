@@ -79,3 +79,52 @@ func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
 		}
 	}
 }
+
+// Invokes a streaming ZeroRPC method,
+// name is the method name,
+// args are the method arguments
+//
+// it returns an array of ZeroRPC response events on success
+//
+// if the ZeroRPC server raised an exception,
+// it's name is returned as the err string along with the response event,
+// the additional exception text and traceback can be found in the response event args
+//
+// it returns ErrLostRemote if the channel misses 2 heartbeat events,
+// default is 10 seconds
+func (c *Client) InvokeStream(name string, args ...interface{}) ([]*Event, error) {
+	log.Printf("ZeroRPC client invoked %s with args %s in streaming mode", name, args)
+
+	ev, err := NewEvent(name, args)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := c.socket.NewChannel()
+	defer ch.Close()
+
+	err = ch.SendEvent(ev)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]*Event, 0)
+
+	for {
+		select {
+		case response := <-ch.channelOutput:
+			if response.Name == "ERR" {
+				return []*Event{response}, errors.New(response.Args[0].(string))
+			} else if response.Name == "OK" {
+				return []*Event{response}, nil
+			} else if response.Name == "STREAM" {
+				out = append(out, response)
+			} else {
+				return out, nil
+			}
+
+		case err := <-ch.channelErrors:
+			return nil, err
+		}
+	}
+}

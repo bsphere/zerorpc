@@ -39,10 +39,13 @@ func NewEvent(name string, args ...interface{}) (*Event, error) {
 
 // Packs an event into MsgPack bytes
 func (e *Event) PackBytes() ([]byte, error) {
-	data := make([]interface{}, 3)
+	data := make([]interface{}, 2)
 	data[0] = e.Header
 	data[1] = e.Name
-	data[2] = e.Args
+	//data[2] = e.Args
+	for _, a := range e.Args {
+		data = append(data, a)
+	}
 
 	var buf []byte
 
@@ -90,12 +93,6 @@ func UnPackBytes(b []byte) (*Event, error) {
 		return nil, errors.New("zerorpc/event interface conversion error")
 	}
 
-	// get the event args
-	a, ok := v.([]interface{})[2].([]interface{})
-	if !ok {
-		return nil, errors.New("zerorpc/event interface conversion error")
-	}
-
 	// converts an interface{} to a type
 	convertValue := func(v interface{}) interface{} {
 		var out interface{}
@@ -111,17 +108,20 @@ func UnPackBytes(b []byte) (*Event, error) {
 		return out
 	}
 
+	// get the event args
 	args := make([]interface{}, 0)
 
-	// handle both array of results and a single result
-	for _, b := range a {
-		x, ok := b.([]interface{})
-		if ok {
-			for _, v := range x {
-				args = append(args, convertValue(v))
+	for i := 2; i < len(v.([]interface{})); i++ {
+		t := v.([]interface{})[i]
+
+		switch t.(type) {
+		case []interface{}:
+			for _, a := range t.([]interface{}) {
+				args = append(args, convertValue(a))
 			}
-		} else {
-			args = append(args, convertValue(b))
+
+		default:
+			args = append(args, convertValue(t))
 		}
 	}
 
