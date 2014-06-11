@@ -3,13 +3,6 @@ package zerorpc
 import (
 	"errors"
 	"log"
-	"time"
-)
-
-const (
-	// ZeroRPC timeout,
-	// default is 30 seconds
-	ZeroRPCTimeout = 1 * time.Minute
 )
 
 // ZeroRPC client representation,

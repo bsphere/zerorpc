@@ -6,7 +6,7 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
-// ZeroMQ protocol version
+// ZeroRPC protocol version
 const ProtocolVersion = 3
 
 // Event representation
