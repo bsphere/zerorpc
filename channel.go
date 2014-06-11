@@ -10,6 +10,10 @@ const (
 	// Heartbeat frequency,
 	// default is 5 seconds
 	HeartbeatFrequency = 5 * time.Second
+
+	// Channel local buffer size,
+	// default is 100
+	BufferSize = 100
 )
 
 type State int
@@ -45,7 +49,7 @@ func (s *Socket) NewChannel() *Channel {
 		Id:            "",
 		state:         Open,
 		socket:        s,
-		socketInput:   make(chan *Event),
+		socketInput:   make(chan *Event, BufferSize),
 		channelOutput: make(chan *Event),
 		channelErrors: make(chan error),
 		lastHeartbeat: time.Now(),
@@ -96,6 +100,19 @@ func (ch *Channel) SendEvent(e *Event) error {
 	return ch.socket.SendEvent(e)
 }
 
+// Returns a pointer to a new "buffer size" event,
+// it also returns the available space on the channel input buffer
+func (ch *Channel) NewBufferSizeEvent() (*Event, int, error) {
+	availSpace := ch.getFreeBufferSize()
+
+	ev, err := NewEvent("_zpc_more", []int{availSpace})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return ev, availSpace, nil
+}
+
 // Sends heartbeat events on the channel as long as the channel is open,
 // the heartbeats interval is defined in HeartbeatFrequency,
 // default is 5 seconds
@@ -107,7 +124,7 @@ func (ch *Channel) sendHeartbeats() {
 			return
 		}
 
-		ev, err := NewHeartbeat()
+		ev, err := NewHeartbeatEvent()
 		if err != nil {
 			log.Printf(err.Error())
 
@@ -127,6 +144,8 @@ func (ch *Channel) sendHeartbeats() {
 }
 
 func (ch *Channel) listen() {
+	streamCounter := 0
+
 	for {
 		ev := <-ch.socketInput
 
@@ -137,12 +156,31 @@ func (ch *Channel) listen() {
 		switch ev.Name {
 		case "OK":
 			ch.channelOutput <- ev
+
 		case "ERR":
 			ch.channelOutput <- ev
+
 		case "STREAM":
 			ch.channelOutput <- ev
+
+			if streamCounter == 0 {
+				me, free, err := ch.NewBufferSizeEvent()
+				if err == nil {
+					streamCounter = free
+
+					ch.SendEvent(me)
+
+					streamCounter--
+				}
+			} else {
+				streamCounter--
+			}
+
 		case "STREAM_DONE":
 			ch.channelOutput <- ev
+
+			streamCounter = 0
+
 		case "_zpc_hb":
 			log.Printf("Channel %s received heartbeat", ch.Id)
 			ch.lastHeartbeat = time.Now()
@@ -162,4 +200,8 @@ func (ch *Channel) handleHeartbeats() {
 
 		time.Sleep(time.Second)
 	}
+}
+
+func (ch *Channel) getFreeBufferSize() int {
+	return cap(ch.socketInput) - len(ch.socketInput)
 }
