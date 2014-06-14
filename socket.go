@@ -9,24 +9,24 @@ import (
 )
 
 // ZeroRPC socket representation
-type Socket struct {
+type socket struct {
 	zmqSocket    *zmq.Socket
-	Channels     []*Channel
+	Channels     []*channel
 	server       *Server
 	socketErrors chan error
 }
 
 // Connects to a ZeroMQ endpoint and returns a pointer to a new znq.DEALER socket,
 // a listener for incoming messages is invoked on the new socket
-func Connect(endpoint string) (*Socket, error) {
+func connect(endpoint string) (*socket, error) {
 	zmqSocket, err := zmq.NewSocket(zmq.DEALER)
 	if err != nil {
 		return nil, err
 	}
 
-	s := Socket{
+	s := socket{
 		zmqSocket:    zmqSocket,
-		Channels:     make([]*Channel, 0),
+		Channels:     make([]*channel, 0),
 		socketErrors: make(chan error),
 	}
 
@@ -43,15 +43,15 @@ func Connect(endpoint string) (*Socket, error) {
 
 // Binds to a ZeroMQ endpoint and returns a pointer to a new znq.ROUTER socket,
 // a listener for incoming messages is invoked on the new socket
-func Bind(endpoint string) (*Socket, error) {
+func bind(endpoint string) (*socket, error) {
 	zmqSocket, err := zmq.NewSocket(zmq.ROUTER)
 	if err != nil {
 		return nil, err
 	}
 
-	s := Socket{
+	s := socket{
 		zmqSocket: zmqSocket,
-		Channels:  make([]*Channel, 0),
+		Channels:  make([]*channel, 0),
 	}
 
 	if err := s.zmqSocket.Bind(endpoint); err != nil {
@@ -67,9 +67,9 @@ func Bind(endpoint string) (*Socket, error) {
 
 // Close the socket,
 // it closes all the channels first
-func (s *Socket) Close() error {
+func (s *socket) close() error {
 	for _, c := range s.Channels {
-		c.Close()
+		c.close()
 	}
 
 	log.Printf("ZeroRPC socket closed")
@@ -77,8 +77,8 @@ func (s *Socket) Close() error {
 }
 
 // Removes a channel from the socket's array of channels
-func (s *Socket) RemoveChannel(c *Channel) {
-	channels := make([]*Channel, 0)
+func (s *socket) removeChannel(c *channel) {
+	channels := make([]*channel, 0)
 
 	for _, t := range s.Channels {
 		if t != c {
@@ -90,7 +90,7 @@ func (s *Socket) RemoveChannel(c *Channel) {
 }
 
 // Sends an event on the ZeroMQ socket
-func (s *Socket) SendEvent(e *Event, identity string) error {
+func (s *socket) sendEvent(e *Event, identity string) error {
 	b, err := e.PackBytes()
 	if err != nil {
 		return err
@@ -109,7 +109,7 @@ func (s *Socket) SendEvent(e *Event, identity string) error {
 	return nil
 }
 
-func (s *Socket) listen() {
+func (s *socket) listen() {
 	log.Printf("ZeroRPC socket listening for incoming data")
 
 	for {
@@ -132,9 +132,9 @@ func (s *Socket) listen() {
 
 		log.Printf("ZeroRPC socket recieved event %s", ev.Header["message_id"].(string))
 
-		var ch *Channel
+		var ch *channel
 		if _, ok := ev.Header["response_to"]; !ok {
-			ch = s.NewChannel(ev.Header["message_id"].(string))
+			ch = s.newChannel(ev.Header["message_id"].(string))
 			go ch.sendHeartbeats()
 
 			if len(barr) > 1 {
@@ -148,7 +148,7 @@ func (s *Socket) listen() {
 			}
 		}
 
-		if ch != nil && ch.state == Open {
+		if ch != nil && ch.state == open {
 			log.Printf("ZeroRPC socket routing event %s to channel %s", ev.Header["message_id"].(string), ch.Id)
 
 			ch.socketInput <- ev

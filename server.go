@@ -8,14 +8,14 @@ import (
 // ZeroRPC server representation,
 // it holds a pointer to the ZeroMQ socket
 type Server struct {
-	socket   *Socket
+	socket   *socket
 	handlers []*TaskHandler
 }
 
 // Task handler representation
 type TaskHandler struct {
 	TaskName    string
-	TaskHandler *func(args []interface{}) (interface{}, error)
+	HandlerFunc *func(args []interface{}) (interface{}, error)
 }
 
 var (
@@ -59,7 +59,7 @@ It also supports first class exceptions, in case of the handler function returns
 the args of the event passed to the client is an array which is [err.Error(), nil, nil]
 */
 func NewServer(endpoint string) (*Server, error) {
-	s, err := Bind(endpoint)
+	s, err := bind(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func NewServer(endpoint string) (*Server, error) {
 
 // Closes the ZeroMQ socket
 func (s *Server) Close() error {
-	return s.socket.Close()
+	return s.socket.close()
 }
 
 // Register a task handler,
@@ -88,7 +88,7 @@ func (s *Server) RegisterTask(name string, handlerFunc *func(args []interface{})
 		}
 	}
 
-	s.handlers = append(s.handlers, &TaskHandler{TaskName: name, TaskHandler: handlerFunc})
+	s.handlers = append(s.handlers, &TaskHandler{TaskName: name, HandlerFunc: handlerFunc})
 
 	log.Printf("ZeroRPC server registered handler for task %s", name)
 
@@ -97,12 +97,12 @@ func (s *Server) RegisterTask(name string, handlerFunc *func(args []interface{})
 
 // Invoke the handler for a task event,
 // it returns ErrNoTaskHandler if no handler is registered for the task
-func (s *Server) HandleTask(ev *Event) (interface{}, error) {
+func (s *Server) handleTask(ev *Event) (interface{}, error) {
 	for _, h := range s.handlers {
 		if h.TaskName == ev.Name {
 			log.Printf("ZeroRPC server handling task %s with args %s", ev.Name, ev.Args)
 
-			return (*h.TaskHandler)(ev.Args)
+			return (*h.HandlerFunc)(ev.Args)
 		}
 	}
 

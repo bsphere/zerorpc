@@ -16,23 +16,23 @@ const (
 	BufferSize = 100
 )
 
-type State int
+type state int
 
 const (
-	Open = iota
-	Closed
+	open = iota
+	closed
 )
 
 var (
-	ErrClosedChannel = errors.New("zerorpc/channel closed channel")
+	errClosedChannel = errors.New("zerorpc/channel closed channel")
 	ErrLostRemote    = errors.New("zerorpc/channel lost remote")
 )
 
 // Channel representation
-type Channel struct {
+type channel struct {
 	Id            string
-	state         State
-	socket        *Socket
+	state         state
+	socket        *socket
 	socketInput   chan *Event
 	channelOutput chan *Event
 	channelErrors chan error
@@ -45,10 +45,10 @@ type Channel struct {
 //
 // it initiates sending of heartbeats event on the channel as long as
 // the channel is open
-func (s *Socket) NewChannel(id string) *Channel {
-	c := Channel{
+func (s *socket) newChannel(id string) *channel {
+	c := channel{
 		Id:            id,
-		state:         Open,
+		state:         open,
 		socket:        s,
 		socketInput:   make(chan *Event, BufferSize),
 		channelOutput: make(chan *Event),
@@ -68,10 +68,10 @@ func (s *Socket) NewChannel(id string) *Channel {
 
 // Close the channel,
 // set it's state to closed and removes it from the socket's array of channels
-func (ch *Channel) Close() {
-	ch.state = Closed
+func (ch *channel) close() {
+	ch.state = closed
 
-	ch.socket.RemoveChannel(ch)
+	ch.socket.removeChannel(ch)
 
 	close(ch.socketInput)
 	close(ch.channelOutput)
@@ -83,9 +83,9 @@ func (ch *Channel) Close() {
 // Sends an event on the channel,
 // it sets the event response_to header to the channel's id
 // and sends the event on the socket the channel belongs to
-func (ch *Channel) SendEvent(e *Event) error {
-	if ch.state == Closed {
-		return ErrClosedChannel
+func (ch *channel) sendEvent(e *Event) error {
+	if ch.state == closed {
+		return errClosedChannel
 	}
 
 	if ch.Id != "" {
@@ -100,15 +100,15 @@ func (ch *Channel) SendEvent(e *Event) error {
 
 	identity := ch.identity
 
-	return ch.socket.SendEvent(e, identity)
+	return ch.socket.sendEvent(e, identity)
 }
 
 // Returns a pointer to a new "buffer size" event,
 // it also returns the available space on the channel input buffer
-func (ch *Channel) NewBufferSizeEvent() (*Event, int, error) {
+func (ch *channel) newBufferSizeEvent() (*Event, int, error) {
 	availSpace := ch.getFreeBufferSize()
 
-	ev, err := NewEvent("_zpc_more", []int{availSpace})
+	ev, err := newEvent("_zpc_more", []int{availSpace})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -119,15 +119,15 @@ func (ch *Channel) NewBufferSizeEvent() (*Event, int, error) {
 // Sends heartbeat events on the channel as long as the channel is open,
 // the heartbeats interval is defined in HeartbeatFrequency,
 // default is 5 seconds
-func (ch *Channel) sendHeartbeats() {
+func (ch *channel) sendHeartbeats() {
 	for {
 		time.Sleep(HeartbeatFrequency)
 
-		if ch.state == Closed {
+		if ch.state == closed {
 			return
 		}
 
-		ev, err := NewHeartbeatEvent()
+		ev, err := newHeartbeatEvent()
 		if err != nil {
 			log.Printf(err.Error())
 
@@ -136,7 +136,7 @@ func (ch *Channel) sendHeartbeats() {
 
 		//log.Printf("Channel %s prepared heartbeat event %s", ch.Id, ev.Header["message_id"].(string))
 
-		if err := ch.SendEvent(ev); err != nil {
+		if err := ch.sendEvent(ev); err != nil {
 			log.Printf(err.Error())
 
 			return
@@ -146,11 +146,11 @@ func (ch *Channel) sendHeartbeats() {
 	}
 }
 
-func (ch *Channel) listen() {
+func (ch *channel) listen() {
 	streamCounter := 0
 
 	for {
-		if ch.state == Closed {
+		if ch.state == closed {
 			return
 		}
 
@@ -171,11 +171,11 @@ func (ch *Channel) listen() {
 			ch.channelOutput <- ev
 
 			if streamCounter == 0 {
-				me, free, err := ch.NewBufferSizeEvent()
+				me, free, err := ch.newBufferSizeEvent()
 				if err == nil {
 					streamCounter = free
 
-					ch.SendEvent(me)
+					ch.sendEvent(me)
 
 					streamCounter--
 				}
@@ -194,23 +194,23 @@ func (ch *Channel) listen() {
 
 		default:
 			log.Printf("Channel %s handling task %s with args %s", ch.Id, ev.Name, ev.Args)
-			go func(ch *Channel, ev *Event) {
-				defer ch.Close()
-				defer ch.socket.RemoveChannel(ch)
+			go func(ch *channel, ev *Event) {
+				defer ch.close()
+				defer ch.socket.removeChannel(ch)
 
-				r, err := ch.socket.server.HandleTask(ev)
+				r, err := ch.socket.server.handleTask(ev)
 				if err == nil {
-					if e, err := NewEvent("OK", []interface{}{r}); err != nil {
+					if e, err := newEvent("OK", []interface{}{r}); err != nil {
 						log.Printf("zerorpc/channel %s", err.Error())
 					} else {
-						e := ch.SendEvent(e)
+						e := ch.sendEvent(e)
 						if e != nil {
 							ch.channelErrors <- e
 						}
 					}
 				} else {
-					if e, err2 := NewEvent("ERR", []interface{}{err.Error(), nil, nil}); err2 == nil {
-						e := ch.SendEvent(e)
+					if e, err2 := newEvent("ERR", []interface{}{err.Error(), nil, nil}); err2 == nil {
+						e := ch.sendEvent(e)
 						if e != nil {
 							ch.channelErrors <- e
 						}
@@ -223,9 +223,9 @@ func (ch *Channel) listen() {
 	}
 }
 
-func (ch *Channel) handleHeartbeats() {
+func (ch *channel) handleHeartbeats() {
 	for {
-		if ch.state == Closed {
+		if ch.state == closed {
 			return
 		}
 
@@ -237,6 +237,6 @@ func (ch *Channel) handleHeartbeats() {
 	}
 }
 
-func (ch *Channel) getFreeBufferSize() int {
+func (ch *channel) getFreeBufferSize() int {
 	return cap(ch.socketInput) - len(ch.socketInput)
 }

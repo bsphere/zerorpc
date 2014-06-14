@@ -8,12 +8,12 @@ import (
 // ZeroRPC client representation,
 // it holds a pointer to the ZeroMQ socket
 type Client struct {
-	socket *Socket
+	socket *socket
 }
 
 // Connects to a ZeroRPC endpoint and returns a pointer to the new client
 func NewClient(endpoint string) (*Client, error) {
-	s, err := Connect(endpoint)
+	s, err := connect(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func NewClient(endpoint string) (*Client, error) {
 
 // Closes the ZeroMQ socket
 func (c *Client) Close() error {
-	return c.socket.Close()
+	return c.socket.close()
 }
 
 /*
@@ -79,15 +79,15 @@ the remote is considered as lost and an ErrLostRemote is returned.
 func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
 	log.Printf("ZeroRPC client invoked %s with args %s", name, args)
 
-	ev, err := NewEvent(name, args)
+	ev, err := newEvent(name, args)
 	if err != nil {
 		return nil, err
 	}
 
-	ch := c.socket.NewChannel("")
-	defer ch.Close()
+	ch := c.socket.newChannel("")
+	defer ch.close()
 
-	err = ch.SendEvent(ev)
+	err = ch.sendEvent(ev)
 	if err != nil {
 		return nil, err
 	}
@@ -158,15 +158,15 @@ the remote is considered as lost and an ErrLostRemote is returned.
 func (c *Client) InvokeStream(name string, args ...interface{}) ([]*Event, error) {
 	log.Printf("ZeroRPC client invoked %s with args %s in streaming mode", name, args)
 
-	ev, err := NewEvent(name, args)
+	ev, err := newEvent(name, args)
 	if err != nil {
 		return nil, err
 	}
 
-	ch := c.socket.NewChannel("")
-	defer ch.Close()
+	ch := c.socket.newChannel("")
+	defer ch.close()
 
-	err = ch.SendEvent(ev)
+	err = ch.sendEvent(ev)
 	if err != nil {
 		return nil, err
 	}

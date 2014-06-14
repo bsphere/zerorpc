@@ -18,7 +18,7 @@ type Event struct {
 
 // Returns a pointer to a new event,
 // a UUID V4 message_id is generated
-func NewEvent(name string, args ...interface{}) (*Event, error) {
+func newEvent(name string, args ...interface{}) (*Event, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
 		return nil, err
@@ -135,8 +135,8 @@ func UnPackBytes(b []byte) (*Event, error) {
 }
 
 // Returns a pointer to a new heartbeat event
-func NewHeartbeatEvent() (*Event, error) {
-	ev, err := NewEvent("_zpc_hb", nil)
+func newHeartbeatEvent() (*Event, error) {
+	ev, err := newEvent("_zpc_hb", nil)
 	if err != nil {
 		return nil, err
 	}
