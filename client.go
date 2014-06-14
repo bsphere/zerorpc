@@ -30,18 +30,52 @@ func (c *Client) Close() error {
 	return c.socket.Close()
 }
 
-// Invokes a ZeroRPC method,
-// name is the method name,
-// args are the method arguments
-//
-// it returns the ZeroRPC response event on success
-//
-// if the ZeroRPC server raised an exception,
-// it's name is returned as the err string along with the response event,
-// the additional exception text and traceback can be found in the response event args
-//
-// it returns ErrLostRemote if the channel misses 2 heartbeat events,
-// default is 10 seconds
+/*
+Invokes a ZeroRPC method,
+name is the method name,
+args are the method arguments
+
+it returns the ZeroRPC response event on success
+
+if the ZeroRPC server raised an exception,
+it's name is returned as the err string along with the response event,
+the additional exception text and traceback can be found in the response event args
+
+it returns ErrLostRemote if the channel misses 2 heartbeat events,
+default is 10 seconds
+
+Usage example:
+
+	package main
+
+	import (
+		"fmt"
+		"github.com/bsphere/zerorpc"
+	)
+
+	func main() {
+		c, err := zerorpc.NewClient("tcp://0.0.0.0:4242")
+		if err != nil {
+			panic(err)
+		}
+
+		defer c.Close()
+
+		response, err := c.Invoke("hello", "John")
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println(response)
+	}
+
+It also supports first class exceptions, in case of an exception,
+the error returned from Invoke() or InvokeStream() is the exception name
+and the args of the returned event are the exception description and traceback.
+
+The client sends heartbeat events every 5 seconds, if twp heartbeat events are missed,
+the remote is considered as lost and an ErrLostRemote is returned.
+*/
 func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
 	log.Printf("ZeroRPC client invoked %s with args %s", name, args)
 
@@ -50,7 +84,7 @@ func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
 		return nil, err
 	}
 
-	ch := c.socket.NewChannel()
+	ch := c.socket.NewChannel("")
 	defer ch.Close()
 
 	err = ch.SendEvent(ev)
@@ -73,18 +107,54 @@ func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
 	}
 }
 
-// Invokes a streaming ZeroRPC method,
-// name is the method name,
-// args are the method arguments
-//
-// it returns an array of ZeroRPC response events on success
-//
-// if the ZeroRPC server raised an exception,
-// it's name is returned as the err string along with the response event,
-// the additional exception text and traceback can be found in the response event args
-//
-// it returns ErrLostRemote if the channel misses 2 heartbeat events,
-// default is 10 seconds
+/*
+Invokes a streaming ZeroRPC method,
+name is the method name,
+args are the method arguments
+
+it returns an array of ZeroRPC response events on success
+
+if the ZeroRPC server raised an exception,
+it's name is returned as the err string along with the response event,
+the additional exception text and traceback can be found in the response event args
+
+it returns ErrLostRemote if the channel misses 2 heartbeat events,
+default is 10 seconds
+
+Usage example:
+
+	package main
+
+	import (
+		"fmt"
+		"github.com/bsphere/zerorpc"
+	)
+
+	func main() {
+		c, err := zerorpc.NewClient("tcp://0.0.0.0:4242")
+		if err != nil {
+			panic(err)
+		}
+
+		defer c.Close()
+
+		response, err := c.InvokeStream("streaming_range", 10, 20, 2)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		for _, r := range response {
+			fmt.Println(r)
+		}
+	}
+
+It also supports first class exceptions, in case of an exception,
+the error returned from Invoke() or InvokeStream() is the exception name
+and the args of the returned event are the exception description and traceback.
+
+The client sends heartbeat events every 5 seconds, if twp heartbeat events are missed,
+the remote is considered as lost and an ErrLostRemote is returned.
+*/
 func (c *Client) InvokeStream(name string, args ...interface{}) ([]*Event, error) {
 	log.Printf("ZeroRPC client invoked %s with args %s in streaming mode", name, args)
 
@@ -93,7 +163,7 @@ func (c *Client) InvokeStream(name string, args ...interface{}) ([]*Event, error
 		return nil, err
 	}
 
-	ch := c.socket.NewChannel()
+	ch := c.socket.NewChannel("")
 	defer ch.Close()
 
 	err = ch.SendEvent(ev)

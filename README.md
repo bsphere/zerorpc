@@ -75,3 +75,38 @@ and the args of the returned event are the exception description and traceback.
 
 The client sends heartbeat events every 5 seconds, if twp heartbeat events are missed,
 the remote is considered as lost and an ErrLostRemote is returned.
+
+
+Server:
+
+```go
+package main
+
+import (
+	"errors"
+	"fmt"
+	"github.com/bsphere/zerorpc"
+	"time"
+)
+
+func main() {
+	s, err := zerorpc.NewServer("tcp://0.0.0.0:4242")
+	if err != nil {
+		panic(err)
+	}
+
+	defer s.Close()
+
+	h := func(v []interface{}) (interface{}, error) {
+		time.Sleep(10 * time.Second)
+		return "Hello, " + v[0].(string), nil
+	}
+
+	s.RegisterTask("hello", &h)
+
+	s.Listen()
+}
+```
+
+It also supports first class exceptions, in case of the handler function returns an error,
+the args of the event passed to the client is an array which is [err.Error(), nil, nil]

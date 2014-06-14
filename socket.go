@@ -1,15 +1,19 @@
+// Package zerorpc provides a client/server Golang library for the ZeroRPC protocol,
+//
+// for additional info see http://zerorpc.dotcloud.com
 package zerorpc
 
 import (
-	"bytes"
 	zmq "github.com/pebbe/zmq4"
 	"log"
 )
 
 // ZeroRPC socket representation
 type Socket struct {
-	zmqSocket *zmq.Socket
-	Channels  []*Channel
+	zmqSocket    *zmq.Socket
+	Channels     []*Channel
+	server       *Server
+	socketErrors chan error
 }
 
 // Connects to a ZeroMQ endpoint and returns a pointer to a new znq.DEALER socket,
@@ -21,8 +25,9 @@ func Connect(endpoint string) (*Socket, error) {
 	}
 
 	s := Socket{
-		zmqSocket: zmqSocket,
-		Channels:  make([]*Channel, 0),
+		zmqSocket:    zmqSocket,
+		Channels:     make([]*Channel, 0),
+		socketErrors: make(chan error),
 	}
 
 	if err := s.zmqSocket.Connect(endpoint); err != nil {
@@ -30,6 +35,30 @@ func Connect(endpoint string) (*Socket, error) {
 	}
 
 	log.Printf("ZeroRPC socket connected to %s", endpoint)
+
+	go s.listen()
+
+	return &s, nil
+}
+
+// Binds to a ZeroMQ endpoint and returns a pointer to a new znq.ROUTER socket,
+// a listener for incoming messages is invoked on the new socket
+func Bind(endpoint string) (*Socket, error) {
+	zmqSocket, err := zmq.NewSocket(zmq.ROUTER)
+	if err != nil {
+		return nil, err
+	}
+
+	s := Socket{
+		zmqSocket: zmqSocket,
+		Channels:  make([]*Channel, 0),
+	}
+
+	if err := s.zmqSocket.Bind(endpoint); err != nil {
+		return nil, err
+	}
+
+	log.Printf("ZeroRPC socket bound to %s", endpoint)
 
 	go s.listen()
 
@@ -61,7 +90,7 @@ func (s *Socket) RemoveChannel(c *Channel) {
 }
 
 // Sends an event on the ZeroMQ socket
-func (s *Socket) SendEvent(e *Event) error {
+func (s *Socket) SendEvent(e *Event, identity string) error {
 	b, err := e.PackBytes()
 	if err != nil {
 		return err
@@ -69,13 +98,13 @@ func (s *Socket) SendEvent(e *Event) error {
 
 	log.Printf("ZeroRPC socket sent event %s", e.Header["message_id"].(string))
 
-	s.zmqSocket.Send("", zmq.SNDMORE)
-	i, err := s.zmqSocket.SendMessage(b)
+	i, err := s.zmqSocket.SendMessage(identity, b)
+
 	if err != nil {
 		return err
 	}
 
-	log.Printf("ZeroRPC socket send %d bytes", i)
+	log.Printf("ZeroRPC socket sent %d bytes", i)
 
 	return nil
 }
@@ -84,37 +113,45 @@ func (s *Socket) listen() {
 	log.Printf("ZeroRPC socket listening for incoming data")
 
 	for {
-		s.zmqSocket.Recv(0)
 		barr, err := s.zmqSocket.RecvMessageBytes(0)
 		if err != nil {
-			continue
+			s.socketErrors <- err
 		}
 
-		b := bytes.NewBuffer(nil)
-
-		for _, bt := range barr {
-			if _, err := b.Write(bt); err != nil {
-				continue
-			}
+		t := 0
+		for _, k := range barr {
+			t += len(k)
 		}
 
-		log.Printf("ZeroRPC socket received %d bytes", len(b.Bytes()))
+		log.Printf("ZeroRPC socket received %d bytes", t)
 
-		ev, err := UnPackBytes(b.Bytes())
+		ev, err := UnPackBytes(barr[len(barr)-1])
 		if err != nil {
-			continue
+			s.socketErrors <- err
 		}
 
-		log.Printf("ZeroRPC socket recieved response event %s", ev.Header["message_id"].(string))
+		log.Printf("ZeroRPC socket recieved event %s", ev.Header["message_id"].(string))
 
-		for _, c := range s.Channels {
-			if c.Id == ev.Header["response_to"].(string) {
-				log.Printf("ZeroRPC socket routing event %s to channel %s", ev.Header["message_id"].(string),
-					ev.Header["response_to"].(string))
+		var ch *Channel
+		if _, ok := ev.Header["response_to"]; !ok {
+			ch = s.NewChannel(ev.Header["message_id"].(string))
+			go ch.sendHeartbeats()
 
-				c.socketInput <- ev
+			if len(barr) > 1 {
+				ch.identity = string(barr[0])
+			}
+		} else {
+			for _, c := range s.Channels {
+				if c.Id == ev.Header["response_to"].(string) {
+					ch = c
+				}
 			}
 		}
 
+		if ch != nil && ch.state == Open {
+			log.Printf("ZeroRPC socket routing event %s to channel %s", ev.Header["message_id"].(string), ch.Id)
+
+			ch.socketInput <- ev
+		}
 	}
 }

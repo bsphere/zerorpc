@@ -37,6 +37,7 @@ type Channel struct {
 	channelOutput chan *Event
 	channelErrors chan error
 	lastHeartbeat time.Time
+	identity      string
 }
 
 // Returns a pointer to a new channel,
@@ -44,9 +45,9 @@ type Channel struct {
 //
 // it initiates sending of heartbeats event on the channel as long as
 // the channel is open
-func (s *Socket) NewChannel() *Channel {
+func (s *Socket) NewChannel(id string) *Channel {
 	c := Channel{
-		Id:            "",
+		Id:            id,
 		state:         Open,
 		socket:        s,
 		socketInput:   make(chan *Event, BufferSize),
@@ -97,7 +98,9 @@ func (ch *Channel) SendEvent(e *Event) error {
 
 	log.Printf("Channel %s sending event %s", ch.Id, e.Header["message_id"].(string))
 
-	return ch.socket.SendEvent(e)
+	identity := ch.identity
+
+	return ch.socket.SendEvent(e, identity)
 }
 
 // Returns a pointer to a new "buffer size" event,
@@ -147,6 +150,10 @@ func (ch *Channel) listen() {
 	streamCounter := 0
 
 	for {
+		if ch.state == Closed {
+			return
+		}
+
 		ev := <-ch.socketInput
 
 		if ev == nil {
@@ -184,6 +191,34 @@ func (ch *Channel) listen() {
 		case "_zpc_hb":
 			log.Printf("Channel %s received heartbeat", ch.Id)
 			ch.lastHeartbeat = time.Now()
+
+		default:
+			log.Printf("Channel %s handling task %s with args %s", ch.Id, ev.Name, ev.Args)
+			go func(ch *Channel, ev *Event) {
+				defer ch.Close()
+				defer ch.socket.RemoveChannel(ch)
+
+				r, err := ch.socket.server.HandleTask(ev)
+				if err == nil {
+					if e, err := NewEvent("OK", []interface{}{r}); err != nil {
+						log.Printf("zerorpc/channel %s", err.Error())
+					} else {
+						e := ch.SendEvent(e)
+						if e != nil {
+							ch.channelErrors <- e
+						}
+					}
+				} else {
+					if e, err2 := NewEvent("ERR", []interface{}{err.Error(), nil, nil}); err2 == nil {
+						e := ch.SendEvent(e)
+						if e != nil {
+							ch.channelErrors <- e
+						}
+					} else {
+						log.Printf("zerorpc/channel %s", err.Error())
+					}
+				}
+			}(ch, ev)
 		}
 	}
 }
