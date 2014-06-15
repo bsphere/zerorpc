@@ -97,7 +97,7 @@ func (s *socket) removeChannel(c *channel) {
 
 // Sends an event on the ZeroMQ socket
 func (s *socket) sendEvent(e *Event, identity string) error {
-	b, err := e.PackBytes()
+	b, err := e.packBytes()
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (s *socket) listen() {
 
 		log.Printf("ZeroRPC socket received %d bytes", t)
 
-		ev, err := UnPackBytes(barr[len(barr)-1])
+		ev, err := unPackBytes(barr[len(barr)-1])
 		if err != nil {
 			s.socketErrors <- err
 		}

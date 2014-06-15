@@ -38,11 +38,11 @@ func newEvent(name string, args ...interface{}) (*Event, error) {
 }
 
 // Packs an event into MsgPack bytes
-func (e *Event) PackBytes() ([]byte, error) {
+func (e *Event) packBytes() ([]byte, error) {
 	data := make([]interface{}, 2)
 	data[0] = e.Header
 	data[1] = e.Name
-	//data[2] = e.Args
+
 	for _, a := range e.Args {
 		data = append(data, a)
 	}
@@ -58,7 +58,7 @@ func (e *Event) PackBytes() ([]byte, error) {
 }
 
 // Unpacks an event fom MsgPack bytes
-func UnPackBytes(b []byte) (*Event, error) {
+func unPackBytes(b []byte) (*Event, error) {
 	var mh codec.MsgpackHandle
 	var v interface{}
 

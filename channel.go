@@ -145,8 +145,6 @@ func (ch *channel) sendHeartbeats() {
 			return
 		}
 
-		//log.Printf("Channel %s prepared heartbeat event %s", ch.Id, ev.Header["message_id"].(string))
-
 		if err := ch.sendEvent(ev); err != nil {
 			log.Printf(err.Error())
 
@@ -204,6 +202,10 @@ func (ch *channel) listen() {
 			ch.lastHeartbeat = time.Now()
 
 		default:
+			if ch.socket.server == nil {
+				continue
+			}
+
 			log.Printf("Channel %s handling task %s with args %s", ch.Id, ev.Name, ev.Args)
 			go func(ch *channel, ev *Event) {
 				defer ch.close()
