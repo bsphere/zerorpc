@@ -6,6 +6,7 @@ package zerorpc
 import (
 	zmq "github.com/pebbe/zmq4"
 	"log"
+	"sync"
 )
 
 // ZeroRPC socket representation
@@ -14,6 +15,7 @@ type socket struct {
 	Channels     []*channel
 	server       *Server
 	socketErrors chan error
+	mu           sync.Mutex
 }
 
 // Connects to a ZeroMQ endpoint and returns a pointer to a new znq.DEALER socket,
@@ -70,6 +72,7 @@ func bind(endpoint string) (*socket, error) {
 func (s *socket) close() error {
 	for _, c := range s.Channels {
 		c.close()
+		s.removeChannel(c)
 	}
 
 	log.Printf("ZeroRPC socket closed")
@@ -78,6 +81,9 @@ func (s *socket) close() error {
 
 // Removes a channel from the socket's array of channels
 func (s *socket) removeChannel(c *channel) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	channels := make([]*channel, 0)
 
 	for _, t := range s.Channels {

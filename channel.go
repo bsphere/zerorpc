@@ -3,6 +3,7 @@ package zerorpc
 import (
 	"errors"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -38,6 +39,7 @@ type channel struct {
 	channelErrors chan error
 	lastHeartbeat time.Time
 	identity      string
+	mu            sync.Mutex
 }
 
 // Returns a pointer to a new channel,
@@ -46,6 +48,9 @@ type channel struct {
 // it initiates sending of heartbeats event on the channel as long as
 // the channel is open
 func (s *socket) newChannel(id string) *channel {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	c := channel{
 		Id:            id,
 		state:         open,
@@ -69,6 +74,9 @@ func (s *socket) newChannel(id string) *channel {
 // Close the channel,
 // set it's state to closed and removes it from the socket's array of channels
 func (ch *channel) close() {
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+
 	ch.state = closed
 
 	ch.socket.removeChannel(ch)
@@ -84,6 +92,9 @@ func (ch *channel) close() {
 // it sets the event response_to header to the channel's id
 // and sends the event on the socket the channel belongs to
 func (ch *channel) sendEvent(e *Event) error {
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+
 	if ch.state == closed {
 		return errClosedChannel
 	}
