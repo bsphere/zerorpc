@@ -14,7 +14,7 @@ const (
 
 	// Channel local buffer size,
 	// default is 100
-	BufferSize = 100
+	bufferSize = 100
 )
 
 type state int
@@ -55,7 +55,7 @@ func (s *socket) newChannel(id string) *channel {
 		Id:            id,
 		state:         open,
 		socket:        s,
-		socketInput:   make(chan *Event, BufferSize),
+		socketInput:   make(chan *Event, bufferSize),
 		channelOutput: make(chan *Event),
 		channelErrors: make(chan error),
 		lastHeartbeat: time.Now(),
