@@ -85,9 +85,9 @@ func (ch *channel) close() {
 
 	ch.socket.removeChannel(ch)
 
-	//close(ch.socketInput)
-	//close(ch.channelOutput)
-	//close(ch.channelErrors)
+	close(ch.socketInput)
+	close(ch.channelOutput)
+	close(ch.channelErrors)
 
 	log.Printf("Channel %s closed", ch.Id)
 }
@@ -222,14 +222,14 @@ func (ch *channel) listen() {
 					} else {
 						e := ch.sendEvent(e)
 						if e != nil {
-							ch.channelErrors <- e
+							ch.socket.socketErrors <- e
 						}
 					}
 				} else {
 					if e, err2 := newEvent("ERR", []interface{}{err.Error(), nil, nil}); err2 == nil {
 						e := ch.sendEvent(e)
 						if e != nil {
-							ch.channelErrors <- e
+							ch.socket.socketErrors <- e
 						}
 					} else {
 						log.Printf("zerorpc/channel %s", err.Error())

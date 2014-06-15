@@ -115,7 +115,7 @@ func (s *Server) Listen() {
 	for {
 		err := <-s.socket.socketErrors
 		if err != nil {
-			log.Printf("ZeroRPC server error %s", err.Error())
+			log.Printf("ZeroRPC server socket error %s", err.Error())
 		}
 	}
 }
