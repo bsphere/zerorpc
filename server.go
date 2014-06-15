@@ -9,11 +9,11 @@ import (
 // it holds a pointer to the ZeroMQ socket
 type Server struct {
 	socket   *socket
-	handlers []*TaskHandler
+	handlers []*taskHandler
 }
 
 // Task handler representation
-type TaskHandler struct {
+type taskHandler struct {
 	TaskName    string
 	HandlerFunc *func(args []interface{}) (interface{}, error)
 }
@@ -66,7 +66,7 @@ func NewServer(endpoint string) (*Server, error) {
 
 	server := Server{
 		socket:   s,
-		handlers: make([]*TaskHandler, 0),
+		handlers: make([]*taskHandler, 0),
 	}
 
 	server.socket.server = &server
@@ -88,7 +88,7 @@ func (s *Server) RegisterTask(name string, handlerFunc *func(args []interface{})
 		}
 	}
 
-	s.handlers = append(s.handlers, &TaskHandler{TaskName: name, HandlerFunc: handlerFunc})
+	s.handlers = append(s.handlers, &taskHandler{TaskName: name, HandlerFunc: handlerFunc})
 
 	log.Printf("ZeroRPC server registered handler for task %s", name)
 
