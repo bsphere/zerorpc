@@ -243,7 +243,14 @@ func (ch *channel) handleHeartbeats() {
 		}
 
 		if time.Since(ch.lastHeartbeat) > 2*HeartbeatFrequency {
-			ch.channelErrors <- ErrLostRemote
+			log.Printf("ZeroRPC channel %s lost two heartbeat events", ch.Id)
+
+			select {
+			case ch.channelErrors <- ErrLostRemote:
+			default:
+				ch.close()
+				return
+			}
 		}
 
 		time.Sleep(time.Second)
