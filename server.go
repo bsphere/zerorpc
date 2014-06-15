@@ -80,6 +80,8 @@ func (s *Server) Close() error {
 }
 
 // Register a task handler,
+// tasks are invoked in new goroutines
+//
 // it returns ErrDuplicateHandler if an handler was already registered for the task
 func (s *Server) RegisterTask(name string, handlerFunc *func(args []interface{}) (interface{}, error)) error {
 	for _, h := range s.handlers {
