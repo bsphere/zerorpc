@@ -77,13 +77,17 @@ func (ch *channel) close() {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 
+	if ch.state == closed {
+		return
+	}
+
 	ch.state = closed
 
 	ch.socket.removeChannel(ch)
 
-	close(ch.socketInput)
-	close(ch.channelOutput)
-	close(ch.channelErrors)
+	//close(ch.socketInput)
+	//close(ch.channelOutput)
+	//close(ch.channelErrors)
 
 	log.Printf("Channel %s closed", ch.Id)
 }
