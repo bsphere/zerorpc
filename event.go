@@ -93,21 +93,6 @@ func unPackBytes(b []byte) (*Event, error) {
 		return nil, errors.New("zerorpc/event interface conversion error")
 	}
 
-	// converts an interface{} to a type
-	convertValue := func(v interface{}) interface{} {
-		var out interface{}
-
-		switch t := v.(type) {
-		case []byte:
-			out = string(t)
-
-		default:
-			out = t
-		}
-
-		return out
-	}
-
 	// get the event args
 	args := make([]interface{}, 0)
 
@@ -142,4 +127,33 @@ func newHeartbeatEvent() (*Event, error) {
 	}
 
 	return ev, nil
+}
+
+// converts an interface{} to a type
+func convertValue(v interface{}) interface{} {
+	var out interface{}
+
+	switch t := v.(type) {
+	case []byte:
+		out = string(t)
+
+	case []interface{}:
+		for i, x := range t {
+			t[i] = convertValue(x)
+		}
+
+		out = t
+
+	case map[interface{}]interface{}:
+		for key, val := range v.(map[interface{}]interface{}) {
+			t[key] = convertValue(val)
+		}
+
+		out = t
+
+	default:
+		out = t
+	}
+
+	return out
 }

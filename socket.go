@@ -104,8 +104,7 @@ func (s *socket) sendEvent(e *Event, identity string) error {
 
 	log.Printf("ZeroRPC socket sent event %s", e.Header["message_id"].(string))
 
-	i, err := s.zmqSocket.SendMessage(identity, b)
-
+	i, err := s.zmqSocket.SendMessage(identity, "", b)
 	if err != nil {
 		return err
 	}
