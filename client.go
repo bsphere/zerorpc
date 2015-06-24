@@ -1,7 +1,7 @@
 package zerorpc
 
 import (
-	"errors"
+	"fmt"
 	"log"
 )
 
@@ -96,7 +96,7 @@ func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
 		select {
 		case response := <-ch.channelOutput:
 			if response.Name == "ERR" {
-				return response, errors.New(response.Args[0].(string))
+				return response, fmt.Errorf("ERR:%s", response.Args)
 			} else {
 				return response, nil
 			}
@@ -177,7 +177,7 @@ func (c *Client) InvokeStream(name string, args ...interface{}) ([]*Event, error
 		select {
 		case response := <-ch.channelOutput:
 			if response.Name == "ERR" {
-				return []*Event{response}, errors.New(response.Args[0].(string))
+				return []*Event{response}, fmt.Errorf("%s", response.Args)
 			} else if response.Name == "OK" {
 				return []*Event{response}, nil
 			} else if response.Name == "STREAM" {

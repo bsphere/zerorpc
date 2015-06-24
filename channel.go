@@ -104,14 +104,14 @@ func (ch *channel) sendEvent(e *Event) error {
 	}
 
 	if ch.Id != "" {
-		e.Header["response_to"] = ch.Id
+		e.Header.ResponseTo = ch.Id
 	} else {
-		ch.Id = e.Header["message_id"].(string)
+		ch.Id = e.Header.Id
 
 		go ch.sendHeartbeats()
 	}
 
-	log.Printf("Channel %s sending event %s", ch.Id, e.Header["message_id"].(string))
+	log.Printf("Channel %s sending event %s", ch.Id, e.Header.Id)
 
 	identity := ch.identity
 
@@ -160,6 +160,7 @@ func (ch *channel) sendHeartbeats() {
 }
 
 func (ch *channel) listen() {
+
 	streamCounter := 0
 
 	for {

@@ -1,7 +1,6 @@
 package zerorpc
 
 import (
-	"errors"
 	uuid "github.com/nu7hatch/gouuid"
 	"github.com/ugorji/go/codec"
 )
@@ -10,8 +9,15 @@ import (
 const ProtocolVersion = 3
 
 // Event representation
+
+type EventHeader struct {
+	Id         string `codec:"message_id,omitempty"`
+	ResponseTo string `codec:"response_to,omitempty"`
+	Version    int    `codec:"v"`
+}
+
 type Event struct {
-	Header map[string]interface{}
+	Header *EventHeader
 	Name   string
 	Args   []interface{}
 }
@@ -24,9 +30,7 @@ func newEvent(name string, args ...interface{}) (*Event, error) {
 		return nil, err
 	}
 
-	header := make(map[string]interface{})
-	header["message_id"] = id.String()
-	header["v"] = ProtocolVersion
+	header := &EventHeader{Id: id.String(), Version: ProtocolVersion}
 
 	e := Event{
 		Header: header,
@@ -36,6 +40,10 @@ func newEvent(name string, args ...interface{}) (*Event, error) {
 
 	return &e, nil
 }
+
+var (
+	mh codec.MsgpackHandle
+)
 
 // Packs an event into MsgPack bytes
 func (e *Event) packBytes() ([]byte, error) {
@@ -49,7 +57,7 @@ func (e *Event) packBytes() ([]byte, error) {
 
 	var buf []byte
 
-	enc := codec.NewEncoderBytes(&buf, &codec.MsgpackHandle{})
+	enc := codec.NewEncoderBytes(&buf, &mh)
 	if err := enc.Encode(data); err != nil {
 		return nil, err
 	}
@@ -59,61 +67,12 @@ func (e *Event) packBytes() ([]byte, error) {
 
 // Unpacks an event fom MsgPack bytes
 func unPackBytes(b []byte) (*Event, error) {
-	var mh codec.MsgpackHandle
-	var v interface{}
-
+	var e Event
 	dec := codec.NewDecoderBytes(b, &mh)
 
-	err := dec.Decode(&v)
+	err := dec.Decode(&e)
 	if err != nil {
 		return nil, err
-	}
-
-	// get the event headers
-	h, ok := v.([]interface{})[0].(map[interface{}]interface{})
-	if !ok {
-		return nil, errors.New("zerorpc/event interface conversion error")
-	}
-
-	header := make(map[string]interface{})
-
-	for k, v := range h {
-		switch t := v.(type) {
-		case []byte:
-			header[k.(string)] = string(t)
-
-		default:
-			header[k.(string)] = t
-		}
-	}
-
-	// get the event name
-	n, ok := v.([]interface{})[1].([]byte)
-	if !ok {
-		return nil, errors.New("zerorpc/event interface conversion error")
-	}
-
-	// get the event args
-	args := make([]interface{}, 0)
-
-	for i := 2; i < len(v.([]interface{})); i++ {
-		t := v.([]interface{})[i]
-
-		switch t.(type) {
-		case []interface{}:
-			for _, a := range t.([]interface{}) {
-				args = append(args, convertValue(a))
-			}
-
-		default:
-			args = append(args, convertValue(t))
-		}
-	}
-
-	e := Event{
-		Header: header,
-		Name:   string(n),
-		Args:   args,
 	}
 
 	return &e, nil
