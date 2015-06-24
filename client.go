@@ -96,7 +96,7 @@ func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
 		select {
 		case response := <-ch.channelOutput:
 			if response.Name == "ERR" {
-				return response, fmt.Errorf("ERR:%s", response.Args)
+				return response, fmt.Errorf("%s", response.Args)
 			} else {
 				return response, nil
 			}
