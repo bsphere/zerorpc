@@ -152,7 +152,7 @@ It also supports first class exceptions, in case of an exception,
 the error returned from Invoke() or InvokeStream() is the exception name
 and the args of the returned event are the exception description and traceback.
 
-The client sends heartbeat events every 5 seconds, if twp heartbeat events are missed,
+The client sends heartbeat events every 5 seconds, if two heartbeat events are missed,
 the remote is considered as lost and an ErrLostRemote is returned.
 */
 func (c *Client) InvokeStream(name string, args ...interface{}) ([]*Event, error) {
