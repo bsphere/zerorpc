@@ -153,7 +153,7 @@ func (s *socket) listen() {
 			}
 		}
 
-		if ch != nil && ch.state == open {
+		if ch != nil && ch.open {
 			log.Printf("ZeroRPC socket routing event %s to channel %s", ev.Header.Id, ch.Id)
 
 			ch.socketInput <- ev
