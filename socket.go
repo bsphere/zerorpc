@@ -75,6 +75,9 @@ func (s *socket) close() error {
 		s.removeChannel(c)
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	log.Printf("ZeroRPC socket closed")
 	return s.zmqSocket.Close()
 }
