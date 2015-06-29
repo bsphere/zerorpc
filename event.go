@@ -8,6 +8,15 @@ import (
 // ZeroRPC protocol version
 const ProtocolVersion = 3
 
+var (
+	mh codec.MsgpackHandle
+)
+
+func init() {
+	mh.RawToString = true
+
+}
+
 // Event representation
 
 type EventHeader struct {
@@ -19,7 +28,7 @@ type EventHeader struct {
 type Event struct {
 	Header *EventHeader
 	Name   string
-	Args   []interface{}
+	Args   codec.MsgpackSpecRpcMultiArgs
 }
 
 // Returns a pointer to a new event,
@@ -40,10 +49,6 @@ func newEvent(name string, args ...interface{}) (*Event, error) {
 
 	return &e, nil
 }
-
-var (
-	mh codec.MsgpackHandle
-)
 
 // Packs an event into MsgPack bytes
 func (e *Event) packBytes() ([]byte, error) {
