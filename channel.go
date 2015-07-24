@@ -169,6 +169,7 @@ func (ch *channel) listen() {
 
 		switch ev.Name {
 		case "OK":
+			ch.lastHeartbeat = time.Now()
 			ch.channelOutput <- ev
 
 		case "ERR":
