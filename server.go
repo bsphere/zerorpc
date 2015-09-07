@@ -7,15 +7,11 @@ import (
 
 // ZeroRPC server representation,
 // it holds a pointer to the ZeroMQ socket
+type HandlerFunc func(args []interface{}) (interface{}, error)
+
 type Server struct {
 	socket   *socket
-	handlers []*taskHandler
-}
-
-// Task handler representation
-type taskHandler struct {
-	TaskName    string
-	HandlerFunc *func(args []interface{}) (interface{}, error)
+	handlers map[string]HandlerFunc
 }
 
 var (
@@ -66,7 +62,7 @@ func NewServer(endpoint string) (*Server, error) {
 
 	server := Server{
 		socket:   s,
-		handlers: make([]*taskHandler, 0),
+		handlers: make(map[string]HandlerFunc, 0),
 	}
 
 	server.socket.server = &server
@@ -83,14 +79,13 @@ func (s *Server) Close() error {
 // tasks are invoked in new goroutines
 //
 // it returns ErrDuplicateHandler if an handler was already registered for the task
-func (s *Server) RegisterTask(name string, handlerFunc *func(args []interface{}) (interface{}, error)) error {
-	for _, h := range s.handlers {
-		if h.TaskName == name {
-			return ErrDuplicateHandler
-		}
+func (s *Server) RegisterTask(name string, handlerFunc func(args []interface{}) (interface{}, error)) error {
+
+	if _, ok := s.handlers[name]; ok {
+		return ErrDuplicateHandler
 	}
 
-	s.handlers = append(s.handlers, &taskHandler{TaskName: name, HandlerFunc: handlerFunc})
+	s.handlers[name] = handlerFunc
 
 	log.Printf("ZeroRPC server registered handler for task %s", name)
 
@@ -100,12 +95,11 @@ func (s *Server) RegisterTask(name string, handlerFunc *func(args []interface{})
 // Invoke the handler for a task event,
 // it returns ErrNoTaskHandler if no handler is registered for the task
 func (s *Server) handleTask(ev *Event) (interface{}, error) {
-	for _, h := range s.handlers {
-		if h.TaskName == ev.Name {
-			log.Printf("ZeroRPC server handling task %s with args %s", ev.Name, ev.Args)
 
-			return (*h.HandlerFunc)(ev.Args)
-		}
+	if h, ok := s.handlers[ev.Name]; ok {
+
+		log.Printf("ZeroRPC server handling task %s with args %s", ev.Name, ev.Args)
+		return h(ev.Args)
 	}
 
 	return nil, ErrNoTaskHandler

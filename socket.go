@@ -4,9 +4,10 @@
 package zerorpc
 
 import (
-	zmq "github.com/pebbe/zmq4"
 	"log"
 	"sync"
+
+	zmq "github.com/pebbe/zmq4"
 )
 
 // ZeroRPC socket representation
