@@ -20,7 +20,7 @@ func init() {
 // Event representation
 
 type EventHeader struct {
-	Id         string `codec:"message_id,omitempty"`
+	Id         string `codec:"message_id"`
 	ResponseTo string `codec:"response_to,omitempty"`
 	Version    int    `codec:"v"`
 }
@@ -74,7 +74,6 @@ func (e *Event) packBytes() ([]byte, error) {
 func unPackBytes(b []byte) (*Event, error) {
 	var e Event
 	dec := codec.NewDecoderBytes(b, &mh)
-
 	err := dec.Decode(&e)
 	if err != nil {
 		return nil, err
