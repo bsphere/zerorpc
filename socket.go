@@ -4,9 +4,10 @@
 package zerorpc
 
 import (
-	zmq "github.com/pebbe/zmq4"
 	"log"
 	"sync"
+
+	zmq "github.com/pebbe/zmq4"
 )
 
 // ZeroRPC socket representation
@@ -75,6 +76,9 @@ func (s *socket) close() error {
 		s.removeChannel(c)
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	log.Printf("ZeroRPC socket closed")
 	return s.zmqSocket.Close()
 }
@@ -102,7 +106,7 @@ func (s *socket) sendEvent(e *Event, identity string) error {
 		return err
 	}
 
-	log.Printf("ZeroRPC socket sent event %s", e.Header["message_id"].(string))
+	log.Printf("ZeroRPC socket sent event %s", e.Header.Id)
 
 	i, err := s.zmqSocket.SendMessage(identity, "", b)
 	if err != nil {
@@ -135,11 +139,11 @@ func (s *socket) listen() {
 			s.socketErrors <- err
 		}
 
-		log.Printf("ZeroRPC socket recieved event %s", ev.Header["message_id"].(string))
+		log.Printf("ZeroRPC socket recieved event %s", ev.Header.Id)
 
 		var ch *channel
-		if _, ok := ev.Header["response_to"]; !ok {
-			ch = s.newChannel(ev.Header["message_id"].(string))
+		if ev.Header.ResponseTo == "" {
+			ch = s.newChannel(ev.Header.Id)
 			go ch.sendHeartbeats()
 
 			if len(barr) > 1 {
@@ -147,14 +151,14 @@ func (s *socket) listen() {
 			}
 		} else {
 			for _, c := range s.Channels {
-				if c.Id == ev.Header["response_to"].(string) {
+				if c.Id == ev.Header.ResponseTo {
 					ch = c
 				}
 			}
 		}
 
-		if ch != nil && ch.state == open {
-			log.Printf("ZeroRPC socket routing event %s to channel %s", ev.Header["message_id"].(string), ch.Id)
+		if ch != nil && ch.open {
+			log.Printf("ZeroRPC socket routing event %s to channel %s", ev.Header.Id, ch.Id)
 
 			ch.socketInput <- ev
 		}

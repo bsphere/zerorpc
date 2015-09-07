@@ -1,7 +1,7 @@
 package zerorpc
 
 import (
-	"errors"
+	"fmt"
 	"log"
 )
 
@@ -96,7 +96,7 @@ func (c *Client) Invoke(name string, args ...interface{}) (*Event, error) {
 		select {
 		case response := <-ch.channelOutput:
 			if response.Name == "ERR" {
-				return response, errors.New(response.Args[0].(string))
+				return response, fmt.Errorf("%s", response.Args)
 			} else {
 				return response, nil
 			}
@@ -152,7 +152,7 @@ It also supports first class exceptions, in case of an exception,
 the error returned from Invoke() or InvokeStream() is the exception name
 and the args of the returned event are the exception description and traceback.
 
-The client sends heartbeat events every 5 seconds, if twp heartbeat events are missed,
+The client sends heartbeat events every 5 seconds, if two heartbeat events are missed,
 the remote is considered as lost and an ErrLostRemote is returned.
 */
 func (c *Client) InvokeStream(name string, args ...interface{}) ([]*Event, error) {
@@ -177,7 +177,7 @@ func (c *Client) InvokeStream(name string, args ...interface{}) ([]*Event, error
 		select {
 		case response := <-ch.channelOutput:
 			if response.Name == "ERR" {
-				return []*Event{response}, errors.New(response.Args[0].(string))
+				return []*Event{response}, fmt.Errorf("%s", response.Args)
 			} else if response.Name == "OK" {
 				return []*Event{response}, nil
 			} else if response.Name == "STREAM" {

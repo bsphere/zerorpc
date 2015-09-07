@@ -17,13 +17,6 @@ const (
 	bufferSize = 100
 )
 
-type state int
-
-const (
-	open = iota
-	closed
-)
-
 var (
 	errClosedChannel = errors.New("zerorpc/channel closed channel")
 	ErrLostRemote    = errors.New("zerorpc/channel lost remote")
@@ -32,7 +25,7 @@ var (
 // Channel representation
 type channel struct {
 	Id            string
-	state         state
+	open          bool
 	socket        *socket
 	socketInput   chan *Event
 	channelOutput chan *Event
@@ -53,7 +46,7 @@ func (s *socket) newChannel(id string) *channel {
 
 	c := channel{
 		Id:            id,
-		state:         open,
+		open:          true,
 		socket:        s,
 		socketInput:   make(chan *Event, bufferSize),
 		channelOutput: make(chan *Event),
@@ -77,11 +70,11 @@ func (ch *channel) close() {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 
-	if ch.state == closed {
+	if !ch.open {
 		return
 	}
 
-	ch.state = closed
+	ch.open = false
 
 	ch.socket.removeChannel(ch)
 
@@ -99,19 +92,19 @@ func (ch *channel) sendEvent(e *Event) error {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 
-	if ch.state == closed {
+	if !ch.open {
 		return errClosedChannel
 	}
 
 	if ch.Id != "" {
-		e.Header["response_to"] = ch.Id
+		e.Header.ResponseTo = ch.Id
 	} else {
-		ch.Id = e.Header["message_id"].(string)
+		ch.Id = e.Header.Id
 
 		go ch.sendHeartbeats()
 	}
 
-	log.Printf("Channel %s sending event %s", ch.Id, e.Header["message_id"].(string))
+	log.Printf("Channel %s sending event %s", ch.Id, e.Header.Id)
 
 	identity := ch.identity
 
@@ -138,7 +131,7 @@ func (ch *channel) sendHeartbeats() {
 	for {
 		time.Sleep(HeartbeatFrequency)
 
-		if ch.state == closed {
+		if !ch.open {
 			return
 		}
 
@@ -160,10 +153,11 @@ func (ch *channel) sendHeartbeats() {
 }
 
 func (ch *channel) listen() {
+
 	streamCounter := 0
 
 	for {
-		if ch.state == closed {
+		if !ch.open {
 			return
 		}
 
@@ -175,6 +169,7 @@ func (ch *channel) listen() {
 
 		switch ev.Name {
 		case "OK":
+			ch.lastHeartbeat = time.Now()
 			ch.channelOutput <- ev
 
 		case "ERR":
@@ -242,7 +237,7 @@ func (ch *channel) listen() {
 
 func (ch *channel) handleHeartbeats() {
 	for {
-		if ch.state == closed {
+		if !ch.open {
 			return
 		}
 
