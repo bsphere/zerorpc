@@ -155,7 +155,7 @@ and the args of the returned event are the exception description and traceback.
 The client sends heartbeat events every 5 seconds, if twp heartbeat events are missed,
 the remote is considered as lost and an ErrLostRemote is returned.
 */
-func (c *Client) InvokeStream(name string, args ...interface{}) ([]*Event, error) {
+func (c *Client) InvokeStream(name string, args ...interface{}) (chan *Event, error) {
 	log.Printf("ZeroRPC client invoked %s with args %s in streaming mode", name, args)
 
 	ev, err := newEvent(name, args)
@@ -164,30 +164,28 @@ func (c *Client) InvokeStream(name string, args ...interface{}) ([]*Event, error
 	}
 
 	ch := c.socket.newChannel("")
-	defer ch.close()
 
 	err = ch.sendEvent(ev)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]*Event, 0)
-
-	for {
-		select {
-		case response := <-ch.channelOutput:
-			if response.Name == "ERR" {
-				return []*Event{response}, errors.New(response.Args[0].(string))
-			} else if response.Name == "OK" {
-				return []*Event{response}, nil
-			} else if response.Name == "STREAM" {
-				out = append(out, response)
-			} else {
-				return out, nil
+	out := make(chan *Event)
+	go func(out chan *Event, ch *channel) {
+		defer close(out)
+		defer ch.close()
+		for {
+			select {
+			case response := <-ch.channelOutput:
+				out <- response
+				if response.Name != "STREAM" {
+					return
+				}
+			case _ = <-ch.channelErrors:
+				return
 			}
-
-		case err := <-ch.channelErrors:
-			return nil, err
 		}
-	}
+		return
+	}(out, ch)
+	return out, nil
 }
