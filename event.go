@@ -49,7 +49,7 @@ func (e *Event) packBytes() ([]byte, error) {
 
 	var buf []byte
 
-	enc := codec.NewEncoderBytes(&buf, &codec.MsgpackHandle{})
+	enc := codec.NewEncoderBytes(&buf, &codec.MsgpackHandle{WriteExt:true})
 	if err := enc.Encode(data); err != nil {
 		return nil, err
 	}
