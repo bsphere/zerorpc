@@ -104,7 +104,7 @@ func (ch *channel) sendEvent(e *Event) error {
 	}
 
 	if ch.Id != "" {
-		e.Header["response_to"] = ch.Id
+		e.Header["response_to"] = []byte(ch.Id)
 	} else {
 		ch.Id = e.Header["message_id"].(string)
 
